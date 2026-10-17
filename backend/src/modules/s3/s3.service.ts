@@ -2,6 +2,7 @@ import { DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, ListObjectsV2
 import { Upload } from '@aws-sdk/lib-storage'
 import type { ConnectedAccount, File, S3StorageConfig } from '@prisma/client'
 import type { Response } from 'express'
+import net from 'node:net'
 import type { Readable } from 'node:stream'
 import { prisma } from '../../config/prisma.js'
 import { decryptText } from '../../utils/crypto.js'
@@ -9,6 +10,10 @@ import { decryptText } from '../../utils/crypto.js'
 type S3Config = S3StorageConfig
 type FileWithAccount = File & { connectedAccount: ConnectedAccount }
 type StreamOptions = { disposition?: 'inline' | 'attachment' }
+
+if (typeof net.setDefaultAutoSelectFamilyAttemptTimeout === 'function') {
+  net.setDefaultAutoSelectFamilyAttemptTimeout(3000)
+}
 
 function contentDisposition(type: 'inline' | 'attachment', fileName: string) {
   return `${type}; filename="${fileName.replaceAll('"', '')}"`
@@ -84,6 +89,18 @@ export async function syncS3Quota(accountId: string) {
       lastSyncedAt: new Date(),
     },
   })
+}
+
+export function describeS3Error(error: unknown) {
+  const candidate = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } }
+  if (candidate?.name === 'TimeoutError' || candidate?.name === 'RequestTimeout') return 'Connection to the S3 endpoint timed out'
+  const statusCode = candidate?.$metadata?.httpStatusCode
+  if (statusCode === 403 || candidate?.name === 'InvalidAccessKeyId' || candidate?.name === 'SignatureDoesNotMatch' || candidate?.name === 'AccessDenied') {
+    return 'Access denied by S3 provider (check access key, secret, and bucket permissions)'
+  }
+  if (statusCode === 404 || candidate?.name === 'NotFound' || candidate?.name === 'NoSuchBucket') return 'S3 bucket not found or not accessible'
+  if (candidate?.message && candidate.message !== 'UnknownError') return candidate.message
+  return 'S3 connection failed'
 }
 
 export async function streamS3File(file: FileWithAccount, range: string | undefined, res: Response, options: StreamOptions = {}) {

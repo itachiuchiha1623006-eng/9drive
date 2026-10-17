@@ -27,6 +27,47 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   })
   const [resumableSessions, setResumableSessions] = useState<Record<string, ResumableSession>>({})
 
+  function uploadSingleFileMultipart(file: File, folderId: string | null, targetAccountId: string | null | undefined, onProgress: (percent: number) => void) {
+    const fieldName = `file-${Math.random().toString(36).slice(2)}`
+    const form = new FormData()
+    form.append('filesMeta', JSON.stringify([{
+      fieldName,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      sizeBytes: String(file.size),
+      folderId: folderId || undefined,
+      targetAccountId: targetAccountId || undefined
+    }]))
+    form.append(fieldName, file)
+
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_URL}/uploads`)
+      xhr.setRequestHeader('Authorization', `Bearer ${getAccessToken()}`)
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)))
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress(100)
+          resolve()
+          return
+        }
+        let message = 'Upload failed'
+        try {
+          const body = JSON.parse(xhr.responseText) as { message?: string }
+          if (body.message) message = body.message
+        } catch {
+          if (xhr.statusText) message = xhr.statusText
+        }
+        reject(new Error(message))
+      }
+      xhr.onerror = () => reject(new Error('Upload failed'))
+      xhr.onabort = () => reject(new Error('Upload aborted'))
+      xhr.send(form)
+    })
+  }
+
   async function uploadSingleFileResumable(file: File, folderId: string | null, onProgress: (percent: number) => void, sessionIdToRetry?: string, targetAccountId?: string | null) {
     const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks (must be multiple of 256KB for Google Drive)
     let sessionId = sessionIdToRetry || ''
@@ -40,7 +81,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
     // 1. Initialize or get status
     if (!sessionId) {
-      const initData = await apiFetch<{ sessionId: string; provider: string }>('/uploads/resumable/init', {
+      const initData = await apiFetch<{ sessionId: string | null; provider: string }>('/uploads/resumable/init', {
         method: 'POST',
         body: JSON.stringify({
           fileName: file.name,
@@ -50,7 +91,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           targetAccountId: targetAccountId || undefined
         })
       })
-      sessionId = initData.sessionId
+      if (initData.provider !== 'google_drive') {
+        await uploadSingleFileMultipart(file, folderId, targetAccountId, onProgress)
+        return
+      }
+      sessionId = initData.sessionId || ''
       // Update session with the active sessionId
       setResumableSessions(prev => ({
         ...prev,

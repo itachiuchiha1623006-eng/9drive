@@ -13,7 +13,7 @@ import { createAuditLog } from '../../utils/audit.js'
 
 export const uploadRouter = Router()
 
-type UploadMeta = { fieldName: string; fileName: string; mimeType: string; sizeBytes: bigint; folderId?: string }
+type UploadMeta = { fieldName: string; fileName: string; mimeType: string; sizeBytes: bigint; folderId?: string; targetAccountId?: string }
 type RoutingMode = 'most_available' | 'round_robin' | 'priority'
 
 function logUpload(message: string, metadata?: Record<string, unknown>) {
@@ -128,12 +128,13 @@ export async function handleUpload(req: AuthRequest, res: Response, next: NextFu
       return res.status(status).json({ code, message })
     }
 
-    const parseBatchMeta = (value: string) => JSON.parse(value).map((item: { fieldName: string; fileName: string; mimeType: string; sizeBytes: string | number; folderId?: string }) => ({
+    const parseBatchMeta = (value: string) => JSON.parse(value).map((item: { fieldName: string; fileName: string; mimeType: string; sizeBytes: string | number; folderId?: string; targetAccountId?: string }) => ({
       fieldName: item.fieldName,
       fileName: item.fileName,
       mimeType: item.mimeType,
       sizeBytes: BigInt(item.sizeBytes),
       folderId: item.folderId,
+      targetAccountId: typeof item.targetAccountId === 'string' ? item.targetAccountId : undefined,
     })) as UploadMeta[]
 
     const metaForFile = (fieldName: string, info: { filename: string; mimeType: string }) => {
@@ -166,6 +167,9 @@ export async function handleUpload(req: AuthRequest, res: Response, next: NextFu
           if (folderRecord.connectedAccountId) {
             targetAccountId = folderRecord.connectedAccountId
           }
+        }
+        if (!targetAccountId && meta.targetAccountId) {
+          targetAccountId = meta.targetAccountId
         }
 
         const account = await selectAccount(req.user!.id, meta.sizeBytes, reservedBytesByAccount, targetAccountId)
@@ -333,18 +337,7 @@ uploadRouter.post('/resumable/init', requireAuth, async (req: AuthRequest, res, 
     if (!account) return res.status(400).json({ code: 'NO_ACCOUNT_WITH_ENOUGH_SPACE', message: 'No connected storage account has enough space.' })
 
     if (account.provider !== 'google_drive') {
-      const session = await prisma.uploadSession.create({
-        data: {
-          userId: req.user!.id,
-          targetConnectedAccountId: account.id,
-          folderId,
-          fileName: body.fileName,
-          mimeType: body.mimeType,
-          sizeBytes,
-          status: 'uploading'
-        }
-      })
-      return res.status(201).json({ sessionId: session.id, provider: account.provider, offset: 0 })
+      return res.status(201).json({ sessionId: null, provider: account.provider, offset: 0 })
     }
 
     const auth = await getAuthedGoogleClient(account)

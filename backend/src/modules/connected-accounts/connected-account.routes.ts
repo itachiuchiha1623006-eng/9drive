@@ -7,7 +7,7 @@ import { requireAuth, type AuthRequest } from '../../middleware/auth.middleware.
 import { decryptText, encryptText, hashToken, randomToken } from '../../utils/crypto.js'
 import { hashPassword } from '../../utils/password.js'
 import { createOAuthClient, syncGoogleQuota } from '../google/google.service.js'
-import { syncS3Quota, testS3Connection } from '../s3/s3.service.js'
+import { describeS3Error, syncS3Quota, testS3Connection } from '../s3/s3.service.js'
 
 export const connectedAccountRouter = Router()
 
@@ -149,7 +149,7 @@ connectedAccountRouter.post('/s3', requireAuth, async (req: AuthRequest, res, ne
       })
     } catch (error) {
       if (!existingAccount) await prisma.connectedAccount.delete({ where: { id: account.id } }).catch(() => undefined)
-      throw error
+      return res.status(422).json({ code: 'S3_CONNECTION_FAILED', message: describeS3Error(error) })
     }
   } catch (error) {
     return next(error)
