@@ -3,6 +3,7 @@ import { Outlet, useOutletContext, NavLink, useLocation, useNavigate, useSearchP
 import {
   Bell,
   Braces,
+  Database,
   FileArchive,
   Gauge,
   History,
@@ -36,6 +37,7 @@ import { cn } from '@/lib/utils'
 
 const menu = [
   { label: 'All Files', icon: FileArchive, href: '/all-files' },
+  { label: 'Storage Browser', icon: Database, href: '/storage-browser' },
   { label: 'Quota Tracker', icon: Gauge, href: '/quota' },
   { label: 'Shared With Me', icon: Share2, href: '/shared' },
   { label: 'Starred', icon: Star, href: '/starred', disabled: true },

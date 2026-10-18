@@ -1,8 +1,8 @@
 import type { Response } from 'express'
-import type { ConnectedAccount, File } from '@prisma/client'
+import type { ConnectedAccount } from '@prisma/client'
 import { getAuthedGoogleClient } from '../google/google.service.js'
 
-type FileWithAccount = File & { connectedAccount: ConnectedAccount }
+type GoogleStreamableFile = { providerFileId: string; name: string; mimeType: string; connectedAccount: ConnectedAccount }
 type StreamOptions = { disposition?: 'inline' | 'attachment' }
 
 export const googleDownloadExportMimeTypes: Record<string, { mimeType: string; extension: string }> = {
@@ -31,7 +31,7 @@ export function normalizeHeaders(headers: Headers | Record<string, string>) {
 }
 
 
-export async function streamGoogleFile(file: FileWithAccount, range: string | undefined, res: Response, options: StreamOptions = {}) {
+export async function streamGoogleFile(file: GoogleStreamableFile, range: string | undefined, res: Response, options: StreamOptions = {}) {
   const auth = await getAuthedGoogleClient(file.connectedAccount)
   const headers = normalizeHeaders(await auth.getRequestHeaders())
   const exportTarget = (options.disposition === 'inline' ? googlePreviewExportMimeTypes : googleDownloadExportMimeTypes)[file.mimeType]

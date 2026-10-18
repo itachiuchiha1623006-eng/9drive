@@ -67,7 +67,7 @@ export async function syncGoogleQuota(accountId: string) {
   })
 }
 
-function escapeDriveQueryValue(value: string) {
+export function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
 

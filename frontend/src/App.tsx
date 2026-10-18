@@ -14,6 +14,7 @@ import { SharedPage } from '@/pages/SharedPage'
 import { StarredPage } from '@/pages/StarredPage'
 import { PublicFilePage } from '@/pages/PublicFilePage'
 import { ApiManagementPage } from '@/pages/ApiManagementPage'
+import { StorageBrowserPage } from '@/pages/StorageBrowserPage'
 import { TrashPage } from '@/pages/TrashPage'
 import { ActivityLogPage } from '@/pages/ActivityLogPage'
 import { UploadProvider } from '@/context/UploadContext'
@@ -33,6 +34,7 @@ function App() {
         <Route element={<DriveLayout />}>
           <Route index element={<Navigate to="/all-files" replace />} />
           <Route path="all-files" element={<AllFilesPage />} />
+          <Route path="storage-browser" element={<StorageBrowserPage />} />
           <Route path="quota" element={<QuotaTrackerPage />} />
           <Route path="shared" element={<SharedPage />} />
           <Route path="recent" element={<RecentPage />} />

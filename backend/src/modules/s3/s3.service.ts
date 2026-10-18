@@ -9,6 +9,7 @@ import { decryptText } from '../../utils/crypto.js'
 
 type S3Config = S3StorageConfig
 type FileWithAccount = File & { connectedAccount: ConnectedAccount }
+type S3StreamableFile = { connectedAccountId: string; providerFileId: string; name: string; mimeType: string }
 type StreamOptions = { disposition?: 'inline' | 'attachment' }
 
 if (typeof net.setDefaultAutoSelectFamilyAttemptTimeout === 'function') {
@@ -103,7 +104,7 @@ export function describeS3Error(error: unknown) {
   return 'S3 connection failed'
 }
 
-export async function streamS3File(file: FileWithAccount, range: string | undefined, res: Response, options: StreamOptions = {}) {
+export async function streamS3File(file: S3StreamableFile, range: string | undefined, res: Response, options: StreamOptions = {}) {
   const config = await getS3ConfigForAccount(file.connectedAccountId)
   const client = createS3Client(config)
   const response = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: file.providerFileId, Range: range }))
